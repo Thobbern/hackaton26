@@ -398,6 +398,134 @@ def jira_comment(issue_key, body):
     console.print(f"Kommentar lagt til på {issue_key}")
 
 
+# ---------------------------------------------------------------------------
+# Page subgroup
+# ---------------------------------------------------------------------------
+
+
+def _get_confluence_client():
+    config = load_config()
+    return ConfluenceClient(
+        instance_url=config["instance_url"],
+        email=config["email"],
+        api_token=config["api_token"],
+    )
+
+
+@main.group()
+def page():
+    """Confluence sidekommandoer."""
+    pass
+
+
+@page.command("list")
+@click.option("--space", required=True, help="Confluence space key")
+def page_list(space):
+    """Vis alle sider i et Confluence-space."""
+    from rich.table import Table
+
+    try:
+        client = _get_confluence_client()
+        pages = client.list_pages(space)
+    except FileNotFoundError as e:
+        console.print(f"[red]Feil:[/red] {e}")
+        raise SystemExit(1)
+    except requests.RequestException as e:
+        console.print(f"[red]Feil ved henting fra Confluence:[/red] {e}")
+        raise SystemExit(1)
+
+    table = Table(title=f"Sider i space: {space}")
+    table.add_column("ID", style="dim")
+    table.add_column("Tittel", style="bold")
+    table.add_column("Parent ID", style="dim")
+
+    for p in pages:
+        table.add_row(str(p.get("id", "")), p.get("title", ""), str(p.get("parentId") or ""))
+
+    console.print(table)
+
+
+@page.command("search")
+@click.option("--space", required=True, help="Confluence space key")
+@click.option("--query", required=True, help="Søketekst")
+def page_search(space, query):
+    """Søk etter sider i et Confluence-space."""
+    from rich.table import Table
+
+    try:
+        client = _get_confluence_client()
+        results = client.search_pages(space, query)
+    except FileNotFoundError as e:
+        console.print(f"[red]Feil:[/red] {e}")
+        raise SystemExit(1)
+    except requests.RequestException as e:
+        console.print(f"[red]Feil ved søk i Confluence:[/red] {e}")
+        raise SystemExit(1)
+
+    table = Table(title=f'Søkeresultater for "{query}" i {space}')
+    table.add_column("ID", style="dim")
+    table.add_column("Tittel", style="bold")
+    table.add_column("Space")
+
+    for item in results:
+        content = item.get("content") or item
+        page_id = str(content.get("id", ""))
+        title = content.get("title", item.get("title", ""))
+        space_name = (content.get("space") or {}).get("key", space)
+        table.add_row(page_id, title, space_name)
+
+    console.print(table)
+    console.print(f"[dim]{len(results)} resultat(er) funnet[/dim]")
+
+
+@page.command("create")
+@click.option("--space", required=True, help="Confluence space key")
+@click.option("--title", required=True, help="Sidetittel")
+@click.option("--parent-id", default=None, help="Parent page ID")
+@click.option("--body", "body_text", default="", help="Sideinnhold (Markdown)")
+def page_create(space, title, parent_id, body_text):
+    """Opprett en ny side i Confluence."""
+    from confluence_sync.converter import markdown_to_storage
+
+    storage_body = markdown_to_storage(body_text) if body_text else ""
+
+    try:
+        client = _get_confluence_client()
+        created = client.create_page(space, title, storage_body, parent_id)
+    except FileNotFoundError as e:
+        console.print(f"[red]Feil:[/red] {e}")
+        raise SystemExit(1)
+    except requests.RequestException as e:
+        console.print(f"[red]Feil ved oppretting av side:[/red] {e}")
+        raise SystemExit(1)
+
+    page_id = created.get("id", "")
+    page_title = created.get("title", title)
+    console.print(f"[green]Side opprettet — ID: {page_id}, tittel: {page_title}[/green]")
+
+
+@page.command("delete")
+@click.argument("page_id")
+@click.option("--confirm", is_flag=True, default=False, help="Bekreft sletting")
+def page_delete(page_id, confirm):
+    """Slett en Confluence-side."""
+    if not confirm:
+        console.print("[red]Advarsel:[/red] Bruk --confirm for å slette")
+        raise SystemExit(1)
+
+    try:
+        client = _get_confluence_client()
+        client.delete_page(page_id)
+    except FileNotFoundError as e:
+        console.print(f"[red]Feil:[/red] {e}")
+        raise SystemExit(1)
+    except requests.RequestException as e:
+        console.print(f"[red]Feil ved sletting av side:[/red] {e}")
+        raise SystemExit(1)
+
+    console.print(f"[green]Side {page_id} slettet.[/green]")
+
+
 @jira.command("update")
 @click.argument("issue_key")
 @click.option("--status", default=None, help="Ny status (f.eks. 'In Progress')")
