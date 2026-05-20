@@ -1,7 +1,6 @@
 import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3";
 
-env.remoteHost = self.location.origin + "/hf/";
-env.remotePathTemplate = "{model}/{file}";
+env.remoteHost = self.location.origin + "/hf";
 env.allowLocalModels = false;
 
 let transcriber = null;
