@@ -1,7 +1,8 @@
-from bs4 import BeautifulSoup, NavigableString
+from bs4 import BeautifulSoup, NavigableString, Tag
 import markdownify
 import markdown
 import re
+from urllib.parse import quote
 
 
 _ADMONITION_MACROS = {"info", "warning", "note", "tip"}
@@ -17,7 +18,9 @@ def _preprocess_confluence_macros(soup: BeautifulSoup) -> None:
             body_tag = macro.find("ac:plain-text-body")
             code = body_tag.get_text() if body_tag else ""
             fence = f"```{lang}\n{code}\n```"
-            macro.replace_with(NavigableString(fence))
+            div = soup.new_tag("div")
+            div.append(NavigableString(fence))
+            macro.replace_with(div)
 
         elif name in _ADMONITION_MACROS:
             label = name.capitalize()
@@ -25,7 +28,12 @@ def _preprocess_confluence_macros(soup: BeautifulSoup) -> None:
             inner = body_tag.decode_contents() if body_tag else ""
             inner_text = BeautifulSoup(inner, "html.parser").get_text(separator=" ").strip()
             blockquote = soup.new_tag("blockquote")
-            blockquote.append(NavigableString(f"**{label}:** {inner_text}"))
+            p = soup.new_tag("p")
+            strong = soup.new_tag("strong")
+            strong.append(NavigableString(f"{label}:"))
+            p.append(strong)
+            p.append(NavigableString(f" {inner_text}"))
+            blockquote.append(p)
             macro.replace_with(blockquote)
 
         else:
@@ -41,7 +49,8 @@ def _preprocess_confluence_links(soup: BeautifulSoup) -> None:
             title = page_tag.get("ri:content-title", "")
             link_body = link.find("ac:plain-text-link-body") or link.find("ac:link-body")
             link_text = link_body.get_text(strip=True) if link_body else title
-            a = soup.new_tag("a", href=title)
+            encoded_title = quote(title, safe="")
+            a = soup.new_tag("a", href=encoded_title)
             a.string = link_text or title
             link.replace_with(a)
         else:
@@ -84,30 +93,39 @@ def _postprocess_code_blocks(html: str) -> str:
     )
 
 
+_ADMONITION_LABELS = {"info", "warning", "note", "tip"}
+
+
 def _postprocess_admonitions(html: str) -> str:
-    admonition_map = {
-        "info": "info",
-        "warning": "warning",
-        "note": "note",
-        "tip": "tip",
-    }
+    soup = BeautifulSoup(html, "html.parser")
 
-    def replace_admonition(m: re.Match) -> str:
-        label = m.group(1).lower()
-        content = m.group(2).strip()
-        macro_name = admonition_map.get(label, label)
-        return (
-            f'<ac:structured-macro ac:name="{macro_name}">'
-            f"<ac:rich-text-body><p>{content}</p></ac:rich-text-body>"
-            f"</ac:structured-macro>"
-        )
+    for blockquote in soup.find_all("blockquote"):
+        paragraphs = blockquote.find_all("p")
+        replacements = []
+        for p in paragraphs:
+            strong = p.find("strong")
+            if strong:
+                label_text = strong.get_text(strip=True).rstrip(":")
+                if label_text.lower() in _ADMONITION_LABELS:
+                    strong.extract()
+                    content = p.get_text(strip=True).lstrip(": ").strip()
+                    macro_tag = soup.new_tag("ac:structured-macro", **{"ac:name": label_text.lower()})
+                    body_tag = soup.new_tag("ac:rich-text-body")
+                    content_p = soup.new_tag("p")
+                    content_p.append(NavigableString(content))
+                    body_tag.append(content_p)
+                    macro_tag.append(body_tag)
+                    replacements.append((p, macro_tag))
 
-    return re.sub(
-        r"<blockquote>\s*<p><strong>(Info|Warning|Note|Tip):</strong>\s*(.*?)</p>\s*</blockquote>",
-        replace_admonition,
-        html,
-        flags=re.DOTALL | re.IGNORECASE,
-    )
+        if replacements and len(replacements) == len(paragraphs):
+            for p, macro_tag in replacements:
+                p.replace_with(macro_tag)
+            blockquote.unwrap()
+        elif replacements:
+            for p, macro_tag in replacements:
+                p.replace_with(macro_tag)
+
+    return str(soup)
 
 
 def _postprocess_macro_comments(html: str) -> str:
