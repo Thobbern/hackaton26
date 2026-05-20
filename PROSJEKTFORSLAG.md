@@ -1,39 +1,16 @@
-# Prosjektforslag til jobb-hackaton
+# Prosjektforslag til hackaton
 
-Her er forslag til prosjekter som passer godt for en intern hackaton:
+## 1. Åpne data / API-er
+Bygg noe smart eller gøy med åpne data og API-er. Det finnes tonnevis av gratis datasett og tjenester der ute — kombiner dem på kreative måter og lag noe ingen har sett før.
 
-1. **AI-assistent for intern kunnskapsbase**  
-   En chatbot som svarer på spørsmål basert på interne dokumenter, rutiner og FAQ.
+## 2. IoT Playground
+Bygg noe som lever! Fysiske knapper, sensorer og dingser i den virkelige verden som skaper magi. Koble hardware til software og lag noe man kan ta og føle på.
 
-2. **Automatisk møtereferat og oppgavefordeling**  
-   Et verktøy som tar opp møtenotater, lager referat og foreslår oppgaver i Jira/Trello.
+## 3. KI-agent for utvikling
+Lag en utviklerrobot i form av en KI-agent. En intelligent assistent som kan hjelpe med koding, debugging, code review eller andre utvikleroppgaver — automatisert og smart.
 
-3. **Dashboard for teamhelse**  
-   Visualisering av trivsel, kapasitet, leveransehastighet og teknisk gjeld fra ulike datakilder.
+## 4. AR-navigasjon på kontoret
+Augmented reality møter kontoret. Bruk kamera, QR-koder og kart for å bygge en AR-opplevelse som hjelper folk å finne frem, oppdage rom eller navigere bygget på en ny måte.
 
-4. **Smart onboarding-portal**  
-   En portal for nye ansatte med sjekklister, opplæringsløp og tilgangsstatus.
-
-5. **CI/CD-feilforklarer**  
-   En løsning som analyserer byggefeil og foreslår sannsynlig årsak og konkrete tiltak.
-
-6. **Intern idébank med prioritering**  
-   En app der ansatte kan foreslå forbedringer, stemme og følge status på idéene.
-
-7. **Automatisk dokumentasjon fra kode**  
-   Verktøy som genererer oppdatert teknisk dokumentasjon og arkitektur-oversikter.
-
-8. **Kostnadsmonitor for skyressurser**  
-   En tjeneste som oppdager unødvendige kostnader i skyplattformen og foreslår optimalisering.
-
-9. **Tilgjengelighets-sjekk for interne apper**  
-   En scanner som finner universell utforming-feil og foreslår forbedringer.
-
-10. **“Fra Slack til sak”-automatisering**  
-    Automatisk opprettelse av sak fra Slack-tråder med kontekst, eier og foreslått prioritet.
-
-## Tips for valg av prosjekt
-
-- Velg et problem som påvirker mange internt.
-- Sørg for at prosjektet kan demonstreres på 3–5 minutter.
-- Definer et tydelig mål: tidsbesparelse, kvalitet eller bedre brukeropplevelse.
+## 5. Arkivet — personlig kunnskapsdatabase
+Din egen kunnskapsbase, integrert med AI og LLM-er. Organiser personlig kunnskap på en smart måte, søk med naturlig språk, og kanskje integrer det med et CLI-verktøy for rask tilgang rett fra terminalen.
