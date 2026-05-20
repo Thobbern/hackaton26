@@ -45,6 +45,46 @@ Bruker [Confluence REST API v2](https://developer.atlassian.com/cloud/confluence
 5. `confluence-sync push` — publiserer endringene tilbake til Confluence
 6. Vis oppdatert side i Confluence — endringene er der
 
+## Jira-integrasjon
+
+CLI-kommandoer under `confluence-sync jira` for å jobbe med issues:
+- `jira list --project KEY` — list issues som tabell
+- `jira show KEY-123` — vis detaljer og kommentarer
+- `jira create --project KEY --summary "..."` — opprett issue
+- `jira comment KEY-123 "tekst"` — legg til kommentar
+- `jira update KEY-123 --status "In Progress"` — endre status/felter
+
+Bruker samme auth som Confluence (Atlassian Cloud API-token).
+
+## Anbefaling: Confluence CLI-kommandoer vs. synk
+
+Vi har to modeller for Confluence-interaksjon, og de utfyller hverandre:
+
+### Modell A: Implisitt via synk (det vi har nå)
+Filsystemet ER grensesnittet. Redigér filer → push. Pull → filer oppdateres.
+- Fungerer for: redigere eksisterende sider, holde en lokal kopi oppdatert
+- Fungerer IKKE for: opprette nye sider, slette sider, flytte sider, søke
+
+### Modell B: Eksplisitte CLI-kommandoer (som Jira-integrasjonen)
+Direkte kommandoer for operasjoner som ikke mapper til filendringer.
+
+### Anbefaling: Hybrid (Modell A + B)
+
+Synk forblir kjernen for dokumentredigering. CLI-kommandoer legges til for operasjoner som trenger det:
+
+```
+confluence-sync page create --space DEV --title "Ny side" --parent "Foreldretittel"
+confluence-sync page search --space DEV --query "API design"
+confluence-sync page list --space DEV
+confluence-sync page delete KEY  (med bekreftelse)
+```
+
+**Pull/push dekker det daglige** — redigér lokalt, synk tilbake. **CLI-kommandoer dekker livssyklusen** — opprett, slett, flytt, søk.
+
+Nye sider kan også håndteres implisitt: lag en ny .md-fil med frontmatter der `confluence_id` er tom → push oppretter siden i Confluence. Men eksplisitte kommandoer er tryggere og mer forutsigbare for en demo.
+
+**Status:** Ikke implementert ennå. Jira-CLI er prioritert først.
+
 ## Koordinator (hovedagent)
 
 Du er **koordinator**. Du skriver ikke kode selv med mindre det er trivialt. Din jobb er å:
