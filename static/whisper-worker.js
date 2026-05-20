@@ -1,9 +1,8 @@
 import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3";
 
-env.allowRemoteModels = true;
+env.remoteHost = self.location.origin + "/hf/";
+env.remotePathTemplate = "{model}/{file}";
 env.allowLocalModels = false;
-
-const MODEL_URL = self.location.origin + "/models/";
 
 let transcriber = null;
 let loading = false;
@@ -19,7 +18,7 @@ async function load() {
   try {
     transcriber = await pipeline(
       "automatic-speech-recognition",
-      MODEL_URL,
+      "Xenova/nb-whisper-small-beta",
       {
         device,
         dtype: "q8",
@@ -30,9 +29,6 @@ async function load() {
           }
           if (p.status === "initiate") {
             self.postMessage({ type: "status", msg: `Henter ${p.file}...` });
-          }
-          if (p.status === "done") {
-            self.postMessage({ type: "status", msg: `${p.file} lastet` });
           }
         },
       }
