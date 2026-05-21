@@ -85,6 +85,52 @@ class ConfluenceClient:
         resp = self.session.delete(f"{self.base_url}/pages/{page_id}")
         resp.raise_for_status()
 
+    def get_page_versions(self, page_id: str) -> list[dict]:
+        """Returner versjons-metadata for en side (nyeste først).
+
+        Hver dict har minst: number, createdAt, authorId, message, minorEdit.
+        Forfatter-display-navn er ikke inkludert; bruk get_user(authorId).
+        """
+        return self._get_paginated(f"{self.base_url}/pages/{page_id}/versions")
+
+    def get_page_version_body(self, page_id: str, version_number: int) -> dict:
+        """Hent body for en spesifikk versjon av en side (storage-format).
+
+        v2 returnerer ikke body for historiske versjoner, så vi faller tilbake
+        til v1 content-API. Returnerer dict med 'body' (storage XHTML),
+        'title', 'version' (med 'when' og 'by').
+        """
+        resp = self.session.get(
+            f"{self.origin}/wiki/rest/api/content/{page_id}",
+            params={
+                "expand": "body.storage,version",
+                "version": version_number,
+            },
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return {
+            "title": data.get("title", ""),
+            "body": (data.get("body") or {}).get("storage", {}).get("value", ""),
+            "version": data.get("version", {}),
+        }
+
+    def get_user(self, account_id: str) -> dict:
+        """Returner brukerinfo (displayName) for en account_id.
+
+        Bruker v1 /user-endepunktet siden v2 ikke har en enkel oppslags-rute.
+        Returnerer fallback-dict hvis brukeren ikke finnes (vanlig for
+        deaktiverte/anonymiserte kontoer).
+        """
+        resp = self.session.get(
+            f"{self.origin}/wiki/rest/api/user",
+            params={"accountId": account_id},
+        )
+        if resp.status_code in (404, 403):
+            return {"accountId": account_id, "displayName": account_id}
+        resp.raise_for_status()
+        return resp.json()
+
     def list_pages(self, space_key: str) -> list[dict]:
         resp = self.session.get(f"{self.base_url}/spaces", params={"keys": space_key})
         resp.raise_for_status()

@@ -16,11 +16,17 @@ dependencies = [
 ]
 
 [project.scripts]
-confluence-sync = "confluence_sync.cli:main"
+gira = "confluence_sync.cli_gira:main"
+gonfluence = "confluence_sync.cli_gonfluence:main"
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+]
+rag = [
+    "sentence-transformers>=2.7",
+    "numpy>=1.26",
+    "mcp>=1.0",
 ]
 
 [build-system]
