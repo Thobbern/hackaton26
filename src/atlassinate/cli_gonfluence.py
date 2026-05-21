@@ -8,9 +8,9 @@ from rich.progress import Progress
 from atlassinate.api import ConfluenceClient
 from atlassinate.auth import load_config
 from atlassinate.cli_common import auth_command
-from atlassinate.models import FileStatus, SyncState
+from atlassinate.models import SyncState
 from atlassinate.paths import mirror_path
-from atlassinate.sync import get_status, mirror_space, push_changes
+from atlassinate.sync import mirror_space
 from atlassinate import edit as edit_mod
 
 console = Console()
@@ -108,66 +108,6 @@ def pull(ctx, space, output, page_id, full):
     """Deprecated: bruk `gonfluence sync` i stedet."""
     console.print("[yellow]`pull` er erstattet av `sync`.[/yellow]")
     ctx.invoke(sync, space=space, output=output, page_id=page_id, full=full)
-
-
-@main.command()
-@click.option("--dry-run", is_flag=True, help="Vis hva som ville blitt pushet")
-@click.argument("files", nargs=-1)
-def push(dry_run, files):
-    """Push lokale endringer tilbake til Confluence."""
-    if not SyncState.state_file_present(Path(".")):
-        console.print(
-            "[yellow]Ingen synk-data funnet. Kjør 'gonfluence sync --space <KEY>' først.[/yellow]"
-        )
-        raise SystemExit(1)
-
-    try:
-        client = _get_confluence_client()
-    except FileNotFoundError as e:
-        console.print(f"[red]Feil:[/red] {e}")
-        raise SystemExit(1)
-
-    results = []
-    try:
-        with Progress(console=console) as progress:
-            task = progress.add_task("Pusher sider...", total=None)
-            pushed_count = 0
-            skipped_count = 0
-
-            def _do_push():
-                nonlocal pushed_count, skipped_count
-                for item in push_changes(Path("."), client, list(files) or None, dry_run):
-                    results.append(item)
-                    if item["status"] == "pushed":
-                        pushed_count += 1
-                        progress.update(task, advance=1, description=f"Pushet: {item['title']} ({pushed_count} pushet, {skipped_count} uendret)")
-                    elif item["status"] == "skipped":
-                        skipped_count += 1
-                        progress.update(task, advance=1, description=f"Uendret: {item['title']} ({pushed_count} pushet, {skipped_count} uendret)")
-                    elif item["status"] == "dry_run":
-                        progress.update(task, advance=1, description=f"Ville pushet: {item['title']}")
-
-            _do_push()
-    except requests.RequestException as e:
-        console.print(f"[red]Feil ved pushing til Confluence:[/red] {e}")
-        raise SystemExit(1)
-
-    for item in results:
-        if item["status"] == "pushed":
-            console.print(f"[green]Pushet:[/green] {item['title']} ({item['file']})")
-        elif item["status"] == "skipped":
-            console.print(f"[dim]Uendret: {item['title']} ({item['file']})[/dim]")
-        elif item["status"] == "dry_run":
-            console.print(f"[yellow]Ville pushet:[/yellow] {item['title']} ({item['file']})")
-
-    pushed = sum(1 for r in results if r["status"] == "pushed")
-    dry_run_count = sum(1 for r in results if r["status"] == "dry_run")
-    skipped = sum(1 for r in results if r["status"] == "skipped")
-
-    if dry_run:
-        console.print(f"\n[yellow]{dry_run_count} sider ville blitt pushet[/yellow], {skipped} uendret.")
-    else:
-        console.print(f"\n[green]{pushed} sider pushet[/green], {skipped} uendret.")
 
 
 def _format_edit_row(entry) -> tuple[str, str, str, str]:
@@ -328,69 +268,6 @@ def rebase(page_id):
         )
     else:
         console.print(f"[yellow]Ukjent status: {status}[/yellow]")
-
-
-@main.command()
-@click.option("--verbose", is_flag=True, help="Vis også uendrede filer")
-@click.option("--check-remote", is_flag=True, help="Sjekk remote endringer (krever nett)")
-def status(verbose, check_remote):
-    """Vis synkroniseringsstatus for lokale filer."""
-    from rich.table import Table
-
-    if not SyncState.state_file_present(Path(".")):
-        console.print(
-            "[yellow]Ingen synk-data funnet. Kjør 'gonfluence sync --space <KEY>' først.[/yellow]"
-        )
-        raise SystemExit(1)
-
-    client = None
-    if check_remote:
-        try:
-            client = _get_confluence_client()
-        except FileNotFoundError as e:
-            console.print(f"[red]Feil:[/red] {e}")
-            raise SystemExit(1)
-
-    try:
-        results = get_status(Path("."), client)
-    except Exception as e:
-        console.print(f"[red]Feil ved lesing av status:[/red] {e}")
-        raise SystemExit(1)
-
-    _STATUS_STYLE = {
-        FileStatus.UNCHANGED: ("green", "unchanged"),
-        FileStatus.MODIFIED_LOCAL: ("yellow", "modified_local"),
-        FileStatus.MODIFIED_REMOTE: ("blue", "modified_remote"),
-        FileStatus.CONFLICT: ("red", "conflict"),
-    }
-
-    table = Table(title="Gonfluence Status")
-    table.add_column("Status", style="bold")
-    table.add_column("Fil")
-    table.add_column("Tittel")
-
-    for item in results:
-        file_status: FileStatus = item["status"]
-        if file_status == FileStatus.UNCHANGED and not verbose:
-            continue
-        color, label = _STATUS_STYLE.get(file_status, ("white", file_status.value))
-        table.add_row(
-            f"[{color}]{label}[/{color}]",
-            item["file"],
-            item["title"],
-        )
-
-    console.print(table)
-
-    modified_local = sum(1 for r in results if r["status"] == FileStatus.MODIFIED_LOCAL)
-    modified_remote = sum(1 for r in results if r["status"] == FileStatus.MODIFIED_REMOTE)
-    conflicts = sum(1 for r in results if r["status"] == FileStatus.CONFLICT)
-
-    console.print(
-        f"[yellow]{modified_local} endret lokalt[/yellow], "
-        f"[blue]{modified_remote} endret remote[/blue], "
-        f"[red]{conflicts} konflikter[/red]"
-    )
 
 
 @main.group()

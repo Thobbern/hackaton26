@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from atlassinate.frontmatter import read_frontmatter, write_frontmatter
-from atlassinate.models import FileStatus, PageMeta, SyncState
+from atlassinate.models import PageMeta, SyncState
 
 
 def make_meta(**kwargs) -> PageMeta:
@@ -91,11 +91,3 @@ def test_sync_state_load_missing_file(tmp_path):
     assert state.pages == {}
 
 
-def test_file_status_enum():
-    assert FileStatus.UNCHANGED.value == "unchanged"
-    assert FileStatus.MODIFIED_LOCAL.value == "modified_local"
-    assert FileStatus.MODIFIED_REMOTE.value == "modified_remote"
-    assert FileStatus.CONFLICT.value == "conflict"
-    assert FileStatus.NEW_LOCAL.value == "new_local"
-    assert FileStatus.DELETED_LOCAL.value == "deleted_local"
-    assert len(FileStatus) == 6

@@ -1,17 +1,6 @@
 from dataclasses import dataclass, field
-from enum import Enum
-from datetime import datetime
 from pathlib import Path
 import json
-
-
-class FileStatus(Enum):
-    UNCHANGED = "unchanged"
-    MODIFIED_LOCAL = "modified_local"
-    MODIFIED_REMOTE = "modified_remote"
-    CONFLICT = "conflict"
-    NEW_LOCAL = "new_local"
-    DELETED_LOCAL = "deleted_local"
 
 
 @dataclass
