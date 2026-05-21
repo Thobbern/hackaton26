@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from confluence_sync.blame import BlameLine
+from atlassinate.blame import BlameLine
 
 CONFIG_FILENAME = ".gonfluence-trust.json"
 CACHE_FILENAME = ".gonfluence-trust-cache.json"

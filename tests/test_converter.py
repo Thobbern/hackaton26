@@ -1,9 +1,9 @@
-"""Tests for confluence_sync.converter."""
+"""Tests for atlassinate.converter."""
 
 import pathlib
 import pytest
 
-from confluence_sync.converter import storage_to_markdown, markdown_to_storage
+from atlassinate.converter import storage_to_markdown, markdown_to_storage
 
 FIXTURES = pathlib.Path(__file__).parent / "fixtures"
 

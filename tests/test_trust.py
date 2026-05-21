@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
-from confluence_sync.blame import Attribution, BlameLine
-from confluence_sync.trust import (
+from atlassinate.blame import Attribution, BlameLine
+from atlassinate.trust import (
     TrustConfig,
     cache_is_fresh,
     compute_trust,
@@ -154,7 +154,7 @@ def test_trust_cache_load_missing_returns_empty(tmp_path):
 
 
 def test_trust_cache_load_corrupt_returns_empty(tmp_path):
-    from confluence_sync.trust import CACHE_FILENAME
+    from atlassinate.trust import CACHE_FILENAME
 
     (tmp_path / CACHE_FILENAME).write_text("not-json{")
     assert load_trust_cache(tmp_path) == {}

@@ -1,4 +1,4 @@
-from confluence_sync.blame import (
+from atlassinate.blame import (
     Attribution,
     BlameLine,
     _attribute_lines,

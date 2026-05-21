@@ -1,7 +1,7 @@
 import click
 from rich.console import Console
 
-from confluence_sync.auth import save_config, validate_credentials
+from atlassinate.auth import save_config, validate_credentials
 
 console = Console()
 

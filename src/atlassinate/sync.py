@@ -5,11 +5,11 @@ from pathlib import Path
 
 import requests as req_lib
 
-from confluence_sync.api import ConfluenceClient
-from confluence_sync.converter import markdown_to_storage, storage_to_markdown
-from confluence_sync.frontmatter import read_frontmatter, write_frontmatter
-from confluence_sync.models import FileStatus, PageMeta, SyncState
-from confluence_sync.tree import build_page_tree, build_file_path
+from atlassinate.api import ConfluenceClient
+from atlassinate.converter import markdown_to_storage, storage_to_markdown
+from atlassinate.frontmatter import read_frontmatter, write_frontmatter
+from atlassinate.models import FileStatus, PageMeta, SyncState
+from atlassinate.tree import build_page_tree, build_file_path
 
 
 def _content_hash(text: str) -> str:

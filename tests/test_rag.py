@@ -1,4 +1,4 @@
-from confluence_sync.rag import chunk_markdown
+from atlassinate.rag import chunk_markdown
 
 
 def test_chunk_empty_returns_empty_list():

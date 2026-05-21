@@ -1,5 +1,5 @@
 [project]
-name = "confluence-sync"
+name = "atlassinate"
 version = "0.1.0"
 description = "Toveis-synkronisering mellom Confluence og lokalt Markdown-filhierarki"
 readme = "README.md"
@@ -16,8 +16,8 @@ dependencies = [
 ]
 
 [project.scripts]
-gira = "confluence_sync.cli_gira:main"
-gonfluence = "confluence_sync.cli_gonfluence:main"
+gira = "atlassinate.cli_gira:main"
+gonfluence = "atlassinate.cli_gonfluence:main"
 
 [project.optional-dependencies]
 dev = [
@@ -34,4 +34,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/confluence_sync"]
+packages = ["src/atlassinate"]

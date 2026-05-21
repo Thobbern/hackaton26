@@ -1,7 +1,7 @@
 from pathlib import Path
 import frontmatter
 
-from confluence_sync.models import PageMeta
+from atlassinate.models import PageMeta
 
 
 def read_frontmatter(filepath: Path) -> tuple[PageMeta, str]:

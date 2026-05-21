@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from confluence_sync.frontmatter import read_frontmatter, write_frontmatter
-from confluence_sync.models import FileStatus, PageMeta, SyncState
+from atlassinate.frontmatter import read_frontmatter, write_frontmatter
+from atlassinate.models import FileStatus, PageMeta, SyncState
 
 
 def make_meta(**kwargs) -> PageMeta:

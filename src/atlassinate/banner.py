@@ -12,7 +12,7 @@ import sys
 from rich.console import Console
 from rich.text import Text
 
-from confluence_sync import __version__
+from atlassinate import __version__
 
 GONFLUENCE_BIG = r"""
  ██████╗  ██████╗ ███╗   ██╗███████╗██╗     ██╗   ██╗███████╗███╗   ██╗ ██████╗███████╗

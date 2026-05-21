@@ -5,11 +5,11 @@ import requests
 from rich.console import Console
 from rich.progress import Progress
 
-from confluence_sync.api import ConfluenceClient
-from confluence_sync.auth import load_config
-from confluence_sync.cli_common import auth_command
-from confluence_sync.models import FileStatus
-from confluence_sync.sync import get_status, pull_space, push_changes
+from atlassinate.api import ConfluenceClient
+from atlassinate.auth import load_config
+from atlassinate.cli_common import auth_command
+from atlassinate.models import FileStatus
+from atlassinate.sync import get_status, pull_space, push_changes
 
 console = Console()
 
@@ -29,7 +29,7 @@ def _get_confluence_client():
 def main(ctx):
     """Gonfluence — synkroniser Confluence til lokalt Markdown."""
     if ctx.invoked_subcommand and ctx.invoked_subcommand != "mcp":
-        from confluence_sync.banner import print_banner
+        from atlassinate.banner import print_banner
 
         print_banner("gonfluence")
     if ctx.invoked_subcommand is None:
@@ -262,7 +262,7 @@ def page_search(space, query):
 @click.option("--body", "body_text", default="", help="Sideinnhold (Markdown)")
 def page_create(space, title, parent_id, body_text):
     """Opprett en ny side i Confluence."""
-    from confluence_sync.converter import markdown_to_storage
+    from atlassinate.converter import markdown_to_storage
 
     storage_body = markdown_to_storage(body_text) if body_text else ""
 
@@ -325,7 +325,7 @@ RAG_SYSTEM_PROMPT_TEMPLATE = (
 
 
 def _resolve_db_path(docs_path: Path) -> Path:
-    from confluence_sync.rag import DEFAULT_DB_NAME
+    from atlassinate.rag import DEFAULT_DB_NAME
 
     return docs_path / DEFAULT_DB_NAME
 
@@ -344,7 +344,7 @@ def _resolve_db_path(docs_path: Path) -> Path:
 )
 def index(docs, model):
     """Bygg/oppdater RAG-indeks for synkede sider (semantisk søk)."""
-    from confluence_sync.rag import (
+    from atlassinate.rag import (
         DEFAULT_MODEL,
         RagDependencyError,
         build_index,
@@ -398,7 +398,7 @@ def mcp(docs):
     Registrer i Claude Code med:
       claude mcp add gonfluence -- gonfluence mcp --docs <absolutt-sti>
     """
-    from confluence_sync.mcp_server import run_stdio
+    from atlassinate.mcp_server import run_stdio
 
     docs_path = Path(docs).resolve()
     # NB: ikke skriv til stdout her — det ville korrupt MCP-protokollen.
@@ -448,13 +448,13 @@ def blame(file, summary, since, as_json, refresh):
     """Vis line-level blame for en synket Confluence-side."""
     import json as json_module
 
-    from confluence_sync.blame import (
+    from atlassinate.blame import (
         author_summary,
         clear_cache,
         compute_blame,
         filter_since,
     )
-    from confluence_sync.frontmatter import read_frontmatter
+    from atlassinate.frontmatter import read_frontmatter
 
     filepath = Path(file).resolve()
     try:
@@ -583,9 +583,9 @@ def trust(file, as_json, refresh):
     """Beregn pålitelighets-score for en synket Confluence-side."""
     import json as json_module
 
-    from confluence_sync.blame import clear_cache, compute_blame
-    from confluence_sync.frontmatter import read_frontmatter
-    from confluence_sync.trust import TrustConfig, compute_trust
+    from atlassinate.blame import clear_cache, compute_blame
+    from atlassinate.frontmatter import read_frontmatter
+    from atlassinate.trust import TrustConfig, compute_trust
 
     filepath = Path(file).resolve()
     try:
@@ -739,9 +739,9 @@ def trust_all(docs, pattern, level, min_score, max_score, limit, workers, sort, 
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from datetime import datetime, timezone
 
-    from confluence_sync.blame import compute_blame
-    from confluence_sync.frontmatter import read_frontmatter
-    from confluence_sync.trust import (
+    from atlassinate.blame import compute_blame
+    from atlassinate.frontmatter import read_frontmatter
+    from atlassinate.trust import (
         TrustConfig,
         cache_is_fresh,
         compute_trust,
@@ -963,7 +963,7 @@ def ask(question, docs, mode, top_k):
     docs_path = Path(docs).resolve()
 
     if mode == "rag":
-        from confluence_sync.rag import RagDependencyError, search
+        from atlassinate.rag import RagDependencyError, search
 
         db_path = _resolve_db_path(docs_path)
         try:

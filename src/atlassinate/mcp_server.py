@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from confluence_sync.rag import DEFAULT_DB_NAME, index_stats, search
+from atlassinate.rag import DEFAULT_DB_NAME, index_stats, search
 
 
 def create_server(docs_dir: Path):

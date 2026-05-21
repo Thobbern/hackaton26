@@ -14,8 +14,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from confluence_sync.api import ConfluenceClient
-from confluence_sync.converter import storage_to_markdown
+from atlassinate.api import ConfluenceClient
+from atlassinate.converter import storage_to_markdown
 
 CACHE_DIR_NAME = ".gonfluence-blame"
 

@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from confluence_sync.frontmatter import read_frontmatter
+from atlassinate.frontmatter import read_frontmatter
 
 DEFAULT_MODEL = "intfloat/multilingual-e5-small"
 DEFAULT_DB_NAME = ".confluence-sync.rag.db"

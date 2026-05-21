@@ -2,15 +2,15 @@ import click
 import requests
 from rich.console import Console
 
-from confluence_sync.auth import load_config
-from confluence_sync.cli_common import auth_command
+from atlassinate.auth import load_config
+from atlassinate.cli_common import auth_command
 
 console = Console()
 
 
 def _get_jira_client():
     config = load_config()
-    from confluence_sync.jira_api import JiraClient
+    from atlassinate.jira_api import JiraClient
     return JiraClient(config["instance_url"], config["email"], config["api_token"])
 
 
@@ -36,7 +36,7 @@ def _adf_to_text(adf: dict | None) -> str:
 def main(ctx):
     """Gira — Jira fra terminalen."""
     if ctx.invoked_subcommand:
-        from confluence_sync.banner import print_banner
+        from atlassinate.banner import print_banner
 
         print_banner("gira")
     else:

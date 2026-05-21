@@ -5,7 +5,7 @@ import pytest
 
 pytest.importorskip("mcp")
 
-from confluence_sync.mcp_server import create_server
+from atlassinate.mcp_server import create_server
 
 
 def test_create_server_registers_expected_tools(tmp_path: Path):

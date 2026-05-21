@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from confluence_sync.tree import build_file_path, build_page_tree, sanitize_filename
+from atlassinate.tree import build_file_path, build_page_tree, sanitize_filename
 
 
 def test_sanitize_filename_normal():
