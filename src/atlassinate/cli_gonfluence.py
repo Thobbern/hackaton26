@@ -11,6 +11,7 @@ from atlassinate.cli_common import auth_command
 from atlassinate.models import FileStatus, SyncState
 from atlassinate.paths import mirror_path
 from atlassinate.sync import get_status, mirror_space, push_changes
+from atlassinate import edit as edit_mod
 
 console = Console()
 
@@ -167,6 +168,166 @@ def push(dry_run, files):
         console.print(f"\n[yellow]{dry_run_count} sider ville blitt pushet[/yellow], {skipped} uendret.")
     else:
         console.print(f"\n[green]{pushed} sider pushet[/green], {skipped} uendret.")
+
+
+def _format_edit_row(entry) -> tuple[str, str, str, str]:
+    state = "endret" if entry.modified else "ren"
+    color = "yellow" if entry.modified else "green"
+    return (
+        f"[{color}]{state}[/{color}]",
+        entry.page_id,
+        entry.title,
+        str(entry.filepath),
+    )
+
+
+@main.command()
+@click.argument("page_id", required=False)
+@click.option("--list", "list_only", is_flag=True, help="List pågående edits")
+@click.option("--discard", is_flag=True, help="Forkast edit-en for PAGE_ID")
+@click.option(
+    "--no-editor",
+    is_flag=True,
+    help="Ikke åpne $EDITOR — bare lag/oppdater arbeidskopien",
+)
+def edit(page_id, list_only, discard, no_editor):
+    """Rediger en synket Confluence-side i $EDITOR.
+
+    Arbeidskopien lever under `~/.atlassinate/gonfluence/.edits/<page_id>/`
+    og kan endres så mange ganger som ønsket. `gonfluence submit <page-id>`
+    publiserer endringene til Confluence; `gonfluence rebase <page-id>`
+    oppdaterer base til siste remote.
+    """
+    import os
+    import subprocess
+    from rich.table import Table
+
+    if list_only:
+        entries = edit_mod.list_edits()
+        if not entries:
+            console.print("[dim]Ingen pågående edits.[/dim]")
+            return
+        table = Table(title="Pågående edits")
+        table.add_column("Status", style="bold")
+        table.add_column("Page ID", style="dim")
+        table.add_column("Tittel")
+        table.add_column("Fil", style="dim")
+        for entry in entries:
+            table.add_row(*_format_edit_row(entry))
+        console.print(table)
+        return
+
+    if not page_id:
+        console.print("[red]Feil:[/red] PAGE_ID kreves (eller bruk --list).")
+        raise SystemExit(1)
+
+    if discard:
+        try:
+            archived = edit_mod.discard_edit(page_id)
+        except FileNotFoundError as e:
+            console.print(f"[red]Feil:[/red] {e}")
+            raise SystemExit(1)
+        console.print(f"[green]Forkastet[/green] edit for {page_id} → {archived}")
+        return
+
+    try:
+        target = edit_mod.start_edit(page_id)
+    except FileNotFoundError as e:
+        console.print(f"[red]Feil:[/red] {e}")
+        raise SystemExit(1)
+
+    console.print(f"[dim]Edit-fil: {target}[/dim]")
+
+    if no_editor:
+        return
+
+    editor = os.environ.get("EDITOR") or os.environ.get("VISUAL") or "vi"
+    try:
+        subprocess.run([editor, str(target)], check=False)
+    except FileNotFoundError:
+        console.print(
+            f"[yellow]Kunne ikke åpne `{editor}`. Sett $EDITOR eller rediger "
+            f"fila direkte:[/yellow] {target}"
+        )
+
+
+@main.command()
+@click.argument("page_id")
+def submit(page_id):
+    """Publiser en pågående edit til Confluence."""
+    try:
+        client = _get_confluence_client()
+    except FileNotFoundError as e:
+        console.print(f"[red]Feil:[/red] {e}")
+        raise SystemExit(1)
+
+    try:
+        result = edit_mod.submit_edit(page_id, client)
+    except FileNotFoundError as e:
+        console.print(f"[red]Feil:[/red] {e}")
+        raise SystemExit(1)
+    except requests.RequestException as e:
+        console.print(f"[red]Feil ved publisering til Confluence:[/red] {e}")
+        raise SystemExit(1)
+
+    status = result["status"]
+    title = result.get("title", page_id)
+
+    if status == "unchanged":
+        console.print(f"[dim]Ingen endringer å publisere for {title}.[/dim]")
+    elif status == "submitted":
+        console.print(
+            f"[green]Publisert:[/green] {title} → v{result['new_version']}"
+        )
+        console.print(f"[dim]Edit arkivert: {result['archived_at']}[/dim]")
+    elif status == "conflict":
+        console.print(
+            f"[red]Konflikt:[/red] {title} har gått fra "
+            f"v{result['base_version']} til v{result['remote_version']} remote. "
+            f"Kjør `gonfluence rebase {page_id}` først."
+        )
+        raise SystemExit(2)
+    else:
+        console.print(f"[yellow]Ukjent status: {status}[/yellow]")
+
+
+@main.command()
+@click.argument("page_id")
+def rebase(page_id):
+    """Hent siste remote-versjon og oppdater edit-ens base."""
+    try:
+        client = _get_confluence_client()
+    except FileNotFoundError as e:
+        console.print(f"[red]Feil:[/red] {e}")
+        raise SystemExit(1)
+
+    try:
+        result = edit_mod.rebase_edit(page_id, client)
+    except FileNotFoundError as e:
+        console.print(f"[red]Feil:[/red] {e}")
+        raise SystemExit(1)
+    except requests.RequestException as e:
+        console.print(f"[red]Feil ved henting fra Confluence:[/red] {e}")
+        raise SystemExit(1)
+
+    status = result["status"]
+    title = result.get("title", page_id)
+
+    if status == "noop":
+        console.print(f"[dim]Allerede oppdatert: {title} står på siste remote-versjon.[/dim]")
+    elif status == "rebased_clean":
+        console.print(
+            f"[green]Rebaset[/green] {title} til v{result['new_base_version']} "
+            f"(ingen lokale endringer)."
+        )
+    elif status == "rebased_with_local_changes":
+        console.print(
+            f"[yellow]Rebaset med lokale endringer:[/yellow] {title} "
+            f"v{result['previous_base_version']} → v{result['new_base_version']}. "
+            f"Neste submit overskriver remote."
+        )
+    else:
+        console.print(f"[yellow]Ukjent status: {status}[/yellow]")
 
 
 @main.command()
