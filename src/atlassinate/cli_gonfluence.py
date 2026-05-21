@@ -8,8 +8,9 @@ from rich.progress import Progress
 from atlassinate.api import ConfluenceClient
 from atlassinate.auth import load_config
 from atlassinate.cli_common import auth_command
-from atlassinate.models import FileStatus
-from atlassinate.sync import get_status, pull_space, push_changes
+from atlassinate.models import FileStatus, SyncState
+from atlassinate.paths import mirror_path
+from atlassinate.sync import get_status, mirror_space, push_changes
 
 console = Console()
 
@@ -41,29 +42,71 @@ main.add_command(auth_command)
 
 @main.command()
 @click.option("--space", required=True, help="Confluence space key")
-@click.option("--output", default=".", help="Output directory")
-@click.option("--page-id", default=None, help="Sync specific page and children")
-def pull(space, output, page_id):
-    """Hent sider fra Confluence og lagre som Markdown."""
+@click.option(
+    "--output",
+    default=None,
+    help="Mappa speilet skrives til (default: ~/.atlassinate/gonfluence/<space>/)",
+)
+@click.option("--page-id", default=None, help="Synk bare denne siden og dens barn")
+@click.option(
+    "--full",
+    is_flag=True,
+    help="Tving full re-pull (ignorer lagret state, last alle sider på nytt)",
+)
+def sync(space, output, page_id, full):
+    """Speil et Confluence-space lokalt som Markdown (enveis).
+
+    Default-mappa er ~/.atlassinate/gonfluence/<space>/. Inkrementelt:
+    hopper over sider hvor remote `version` matcher state. Sider som er
+    fjernet remote, slettes lokalt.
+    """
     try:
         client = _get_confluence_client()
     except FileNotFoundError as e:
         console.print(f"[red]Feil:[/red] {e}")
         raise SystemExit(1)
 
+    output_path = Path(output).resolve() if output else mirror_path(space)
+    console.print(f"[dim]Mappe: {output_path}[/dim]")
+
     try:
         with Progress(console=console) as progress:
             task = progress.add_task("Henter sider...", total=None)
 
-            def on_page(title):
-                progress.update(task, advance=1, description=f"Hentet: {title}")
+            def on_page(title, action):
+                label = {"pulled": "Hentet", "skipped": "Uendret", "removed": "Fjernet"}.get(action, action)
+                progress.update(task, advance=1, description=f"{label}: {title}")
 
-            count = pull_space(space, Path(output), client, page_id=page_id, progress_callback=on_page)
+            result = mirror_space(
+                space,
+                output_path,
+                client,
+                page_id=page_id,
+                incremental=not full,
+                progress_callback=on_page,
+            )
     except requests.RequestException as e:
         console.print(f"[red]Feil ved henting fra Confluence:[/red] {e}")
         raise SystemExit(1)
 
-    console.print(f"[green]Ferdig! {count} sider synkronisert.[/green]")
+    console.print(
+        f"[green]Ferdig![/green] "
+        f"{result['pulled']} hentet, {result['skipped']} uendret, "
+        f"{result['removed']} fjernet."
+    )
+
+
+# Skjult bak-kompat-alias for tidligere `pull`-kommando.
+@main.command(hidden=True)
+@click.option("--space", required=True)
+@click.option("--output", default=None)
+@click.option("--page-id", default=None)
+@click.option("--full", is_flag=True)
+@click.pass_context
+def pull(ctx, space, output, page_id, full):
+    """Deprecated: bruk `gonfluence sync` i stedet."""
+    console.print("[yellow]`pull` er erstattet av `sync`.[/yellow]")
+    ctx.invoke(sync, space=space, output=output, page_id=page_id, full=full)
 
 
 @main.command()
@@ -71,9 +114,9 @@ def pull(space, output, page_id):
 @click.argument("files", nargs=-1)
 def push(dry_run, files):
     """Push lokale endringer tilbake til Confluence."""
-    if not (Path(".") / ".confluence-sync.json").exists():
+    if not SyncState.state_file_present(Path(".")):
         console.print(
-            "[yellow]Ingen synk-data funnet. Kjør 'gonfluence pull --space <KEY>' først.[/yellow]"
+            "[yellow]Ingen synk-data funnet. Kjør 'gonfluence sync --space <KEY>' først.[/yellow]"
         )
         raise SystemExit(1)
 
@@ -133,9 +176,9 @@ def status(verbose, check_remote):
     """Vis synkroniseringsstatus for lokale filer."""
     from rich.table import Table
 
-    if not (Path(".") / ".confluence-sync.json").exists():
+    if not SyncState.state_file_present(Path(".")):
         console.print(
-            "[yellow]Ingen synk-data funnet. Kjør 'gonfluence pull --space <KEY>' først.[/yellow]"
+            "[yellow]Ingen synk-data funnet. Kjør 'gonfluence sync --space <KEY>' først.[/yellow]"
         )
         raise SystemExit(1)
 
@@ -495,10 +538,10 @@ def blame(file, summary, since, as_json, refresh):
         console.print(f"[red]Feil:[/red] {e}")
         raise SystemExit(1)
 
-    # Cache ligger ved siden av synkede filer; finn rot via .confluence-sync.json
+    # Cache ligger ved siden av synkede filer; finn rot via state-fila.
     docs_root = filepath.parent
     while docs_root != docs_root.parent:
-        if (docs_root / ".confluence-sync.json").exists():
+        if SyncState.state_file_present(docs_root):
             break
         docs_root = docs_root.parent
     else:

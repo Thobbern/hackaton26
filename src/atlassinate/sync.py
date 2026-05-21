@@ -63,30 +63,143 @@ def _traverse_tree(
     return count
 
 
-def pull_space(space_key: str, output_dir: Path, client: ConfluenceClient, page_id: str | None = None, progress_callback: Callable[[str], None] | None = None) -> int:
-    """Pull all pages from a Confluence space and save as local Markdown files.
+def mirror_space(
+    space_key: str,
+    output_dir: Path,
+    client: ConfluenceClient,
+    page_id: str | None = None,
+    incremental: bool = True,
+    progress_callback: Callable[[str, str], None] | None = None,
+) -> dict:
+    """Speil et Confluence-space lokalt som Markdown (enveis, server → lokal).
 
-    If page_id is given, only that page and its children are synced.
-    Returns the number of pages synced.
+    Inkrementell modus (default): hopper over sider hvor remote `version`
+    matcher lagret state. Sider som finnes lokalt men ikke remote, fjernes.
+
+    Hvis page_id er gitt synkes kun den siden og dens barn, og deletion-
+    tracking er deaktivert (siden vi ikke har hele space-bildet).
+
+    Returnerer dict med statistikk: pulled, skipped, removed, total.
+
+    Progress-callback kalles med (title, action) hvor action er "pulled",
+    "skipped" eller "removed".
     """
-    if page_id is not None:
-        root_page = client.get_page(page_id)
-        children = client.get_page_children(page_id)
-        pages = [root_page] + children
-    else:
-        pages = client.get_space_pages(space_key)
-    tree = build_page_tree(pages)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    state = SyncState(
+    prior_state = SyncState.load(output_dir) if incremental else SyncState()
+    prior_versions = {pid: meta.get("version") for pid, meta in prior_state.pages.items()}
+    prior_pages_to_remove = set(prior_state.pages.keys())
+
+    new_state = SyncState(
         instance_url=client.base_url,
         space_key=space_key,
         last_full_sync=datetime.now(timezone.utc).isoformat(),
+        pages=dict(prior_state.pages),
     )
 
-    count = _traverse_tree(tree["roots"], output_dir, space_key, state, 0, progress_callback)
+    if page_id is not None:
+        root_page = client.get_page(page_id)
+        children = client.get_page_children(page_id)
+        full_pages = [root_page] + children
+        summaries = full_pages
+        track_deletions = False
+    else:
+        summaries = client.get_space_page_summaries(space_key)
+        full_pages = None
+        track_deletions = True
 
-    state.save(output_dir)
-    return count
+    pulled = 0
+    skipped = 0
+
+    pages_to_fetch: list[dict] = []
+    for summary in summaries:
+        pid = summary["id"]
+        prior_pages_to_remove.discard(pid)
+        remote_version = (summary.get("version") or {}).get("number")
+        if (
+            incremental
+            and remote_version is not None
+            and prior_versions.get(pid) == remote_version
+        ):
+            skipped += 1
+            if progress_callback is not None:
+                skipped_title = summary.get("title", pid)
+                progress_callback(skipped_title, "skipped")
+            continue
+        pages_to_fetch.append(summary)
+
+    if full_pages is not None:
+        fetched_pages = [p for p in full_pages if p["id"] in {s["id"] for s in pages_to_fetch}]
+    else:
+        fetched_pages = [client.get_page(s["id"]) for s in pages_to_fetch]
+
+    tree = build_page_tree(fetched_pages)
+    pulled = _traverse_tree(
+        tree["roots"],
+        output_dir,
+        space_key,
+        new_state,
+        0,
+        lambda title: progress_callback(title, "pulled") if progress_callback else None,
+    )
+
+    removed = 0
+    if track_deletions:
+        for pid in prior_pages_to_remove:
+            meta = prior_state.pages.get(pid, {})
+            removed_title = meta.get("title", pid)
+            file_rel = _find_local_file(output_dir, pid)
+            if file_rel is not None and file_rel.exists():
+                file_rel.unlink()
+            new_state.pages.pop(pid, None)
+            removed += 1
+            if progress_callback is not None:
+                progress_callback(removed_title, "removed")
+
+    new_state.save(output_dir)
+
+    return {
+        "pulled": pulled,
+        "skipped": skipped,
+        "removed": removed,
+        "total": pulled + skipped,
+    }
+
+
+def _find_local_file(output_dir: Path, page_id: str) -> Path | None:
+    """Finn lokal markdown-fil som matcher en confluence_id i frontmatter."""
+    for md in output_dir.rglob("*.md"):
+        try:
+            meta, _ = read_frontmatter(md)
+        except Exception:
+            continue
+        if meta.confluence_id == page_id:
+            return md
+    return None
+
+
+# Bak-kompat: gammelt navn brukt av tidligere CLI. Beholdes som tynn wrapper
+# slik at evt. eksterne kallere ikke ryker. Returnerer kun antall pulled+skipped.
+def pull_space(
+    space_key: str,
+    output_dir: Path,
+    client: ConfluenceClient,
+    page_id: str | None = None,
+    progress_callback: Callable[[str], None] | None = None,
+) -> int:
+    def _cb(title: str, action: str) -> None:
+        if progress_callback and action == "pulled":
+            progress_callback(title)
+
+    result = mirror_space(
+        space_key,
+        output_dir,
+        client,
+        page_id=page_id,
+        incremental=False,
+        progress_callback=_cb,
+    )
+    return result["pulled"]
 
 
 def push_changes(

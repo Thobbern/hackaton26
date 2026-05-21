@@ -56,6 +56,9 @@ class SyncState:
     last_full_sync: str = ""
     pages: dict[str, dict] = field(default_factory=dict)
 
+    STATE_FILENAME = ".atlassinate-sync.json"
+    LEGACY_STATE_FILENAME = ".confluence-sync.json"
+
     def save(self, path: Path) -> None:
         data = {
             "version": self.version,
@@ -64,14 +67,16 @@ class SyncState:
             "last_full_sync": self.last_full_sync,
             "pages": self.pages,
         }
-        sync_file = path / ".confluence-sync.json"
+        sync_file = path / self.STATE_FILENAME
         sync_file.write_text(json.dumps(data, indent=2))
 
     @classmethod
     def load(cls, path: Path) -> "SyncState":
-        sync_file = path / ".confluence-sync.json"
+        sync_file = path / cls.STATE_FILENAME
         if not sync_file.exists():
-            return cls()
+            sync_file = path / cls.LEGACY_STATE_FILENAME
+            if not sync_file.exists():
+                return cls()
         data = json.loads(sync_file.read_text())
         return cls(
             version=data.get("version", 1),
@@ -80,3 +85,9 @@ class SyncState:
             last_full_sync=data.get("last_full_sync", ""),
             pages=data.get("pages", {}),
         )
+
+    @classmethod
+    def state_file_present(cls, path: Path) -> bool:
+        return (path / cls.STATE_FILENAME).exists() or (
+            path / cls.LEGACY_STATE_FILENAME
+        ).exists()

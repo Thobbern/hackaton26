@@ -24,6 +24,20 @@ class ConfluenceClient:
         )
         return [self.get_page(summary["id"]) for summary in page_summaries]
 
+    def get_space_page_summaries(self, space_key: str) -> list[dict]:
+        """Hent kun side-metadata (id, title, parentId, version) uten body.
+
+        Brukes til inkrementell synk: vi sammenligner remote versjon mot
+        lokalt lagret versjon før vi gjør en full body-fetch.
+        """
+        resp = self.session.get(f"{self.base_url}/spaces", params={"keys": space_key})
+        resp.raise_for_status()
+        results = resp.json().get("results", [])
+        if not results:
+            return []
+        space_id = results[0]["id"]
+        return self._get_paginated(f"{self.base_url}/spaces/{space_id}/pages")
+
     def get_page(self, page_id: str) -> dict:
         resp = self.session.get(
             f"{self.base_url}/pages/{page_id}",
