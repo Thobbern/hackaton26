@@ -62,7 +62,7 @@ gonfluence auth
 ```
 
 Spør om Atlassian-instans, e-post og API-token og lagrer i
-`~/.atlassinate/config.yaml`. Samme konfigurasjon brukes av `gira`.
+`~/.confluence-sync/config.yaml`. Samme konfigurasjon brukes av `gira`.
 
 API-tokens opprettes på
 <https://id.atlassian.com/manage-profile/security/api-tokens>.
