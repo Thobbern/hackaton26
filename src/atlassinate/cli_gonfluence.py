@@ -330,19 +330,40 @@ def _resolve_db_path(docs_path: Path) -> Path:
     return docs_path / DEFAULT_DB_NAME
 
 
+def _resolve_docs(docs: str | None, space: str | None) -> Path:
+    """Bestem hvilken dokumentasjonsmappe en kommando skal jobbe mot.
+
+    Eksplisitt `--docs` vinner. Ellers `--space` → mirror under
+    `~/.atlassinate/gonfluence/<space>/`. Faller tilbake til cwd hvis
+    ingen er gitt (bak-kompat).
+    """
+    from atlassinate.paths import mirror_path
+
+    if docs is not None:
+        return Path(docs).resolve()
+    if space:
+        return mirror_path(space).resolve()
+    return Path(".").resolve()
+
+
 @main.command()
 @click.option(
     "--docs",
-    default=".",
+    default=None,
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
-    help="Mappe med markdown-dokumentasjon (default: gjeldende mappe)",
+    help="Mappe med markdown-dokumentasjon (default: mirror for --space, ellers cwd)",
+)
+@click.option(
+    "--space",
+    default=None,
+    help="Space-key for mirror under ~/.atlassinate/gonfluence/<space>/",
 )
 @click.option(
     "--model",
     default=None,
     help="Sentence-transformers modellnavn (default: multilingual-e5-small)",
 )
-def index(docs, model):
+def index(docs, space, model):
     """Bygg/oppdater RAG-indeks for synkede sider (semantisk søk)."""
     from atlassinate.rag import (
         DEFAULT_MODEL,
@@ -351,7 +372,7 @@ def index(docs, model):
         index_stats,
     )
 
-    docs_path = Path(docs).resolve()
+    docs_path = _resolve_docs(docs, space)
     db_path = _resolve_db_path(docs_path)
     model_name = model or DEFAULT_MODEL
 
@@ -388,11 +409,16 @@ def index(docs, model):
 @main.command()
 @click.option(
     "--docs",
-    default=".",
+    default=None,
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
-    help="Mappe med markdown-dokumentasjon (default: gjeldende mappe)",
+    help="Mappe med markdown-dokumentasjon (default: mirror for --space, ellers cwd)",
 )
-def mcp(docs):
+@click.option(
+    "--space",
+    default=None,
+    help="Space-key for mirror under ~/.atlassinate/gonfluence/<space>/",
+)
+def mcp(docs, space):
     """Start MCP-server som gir Claude Code tilgang til search_docs-verktøyet.
 
     Registrer i Claude Code med:
@@ -400,7 +426,7 @@ def mcp(docs):
     """
     from atlassinate.mcp_server import run_stdio
 
-    docs_path = Path(docs).resolve()
+    docs_path = _resolve_docs(docs, space)
     # NB: ikke skriv til stdout her — det ville korrupt MCP-protokollen.
     run_stdio(docs_path)
 
@@ -694,9 +720,14 @@ def trust(file, as_json, refresh):
 @main.command("trust-all")
 @click.option(
     "--docs",
-    default=".",
+    default=None,
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
-    help="Mappe med markdown-dokumentasjon (default: gjeldende mappe)",
+    help="Mappe med markdown-dokumentasjon (default: mirror for --space, ellers cwd)",
+)
+@click.option(
+    "--space",
+    default=None,
+    help="Space-key for mirror under ~/.atlassinate/gonfluence/<space>/",
 )
 @click.option(
     "--pattern",
@@ -728,7 +759,7 @@ def trust(file, as_json, refresh):
 )
 @click.option("--refresh", is_flag=True, help="Ignorer trust-cache og reberegn alt")
 @click.option("--json", "as_json", is_flag=True, help="Output som JSON")
-def trust_all(docs, pattern, level, min_score, max_score, limit, workers, sort, refresh, as_json):
+def trust_all(docs, space, pattern, level, min_score, max_score, limit, workers, sort, refresh, as_json):
     """Kjør trust-analyse parallelt over alle synkede filer.
 
     Bruker frontmatter-versjonen for å hoppe over uendrede sider via
@@ -750,7 +781,7 @@ def trust_all(docs, pattern, level, min_score, max_score, limit, workers, sort, 
         score_to_dict,
     )
 
-    docs_path = Path(docs).resolve()
+    docs_path = _resolve_docs(docs, space)
 
     targets: list[tuple[Path, object]] = []
     for filepath in sorted(docs_path.rglob(pattern)):
@@ -924,9 +955,14 @@ def trust_all(docs, pattern, level, min_score, max_score, limit, workers, sort, 
 @click.argument("question")
 @click.option(
     "--docs",
-    default=".",
+    default=None,
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
-    help="Mappe med markdown-dokumentasjon (default: gjeldende mappe)",
+    help="Mappe med markdown-dokumentasjon (default: mirror for --space, ellers cwd)",
+)
+@click.option(
+    "--space",
+    default=None,
+    help="Space-key for mirror under ~/.atlassinate/gonfluence/<space>/",
 )
 @click.option(
     "--mode",
@@ -940,7 +976,7 @@ def trust_all(docs, pattern, level, min_score, max_score, limit, workers, sort, 
     show_default=True,
     help="Antall chunks å hente i rag-modus.",
 )
-def ask(question, docs, mode, top_k):
+def ask(question, docs, space, mode, top_k):
     """Spør Claude om dokumentasjonen via Claude Code-abonnementet ditt."""
     import shutil
     import subprocess
@@ -960,7 +996,7 @@ def ask(question, docs, mode, top_k):
         )
         raise SystemExit(1)
 
-    docs_path = Path(docs).resolve()
+    docs_path = _resolve_docs(docs, space)
 
     if mode == "rag":
         from atlassinate.rag import RagDependencyError, search
